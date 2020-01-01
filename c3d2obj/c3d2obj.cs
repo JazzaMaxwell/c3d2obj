@@ -196,10 +196,10 @@ namespace c3d2obj
         static int Main(string[] args)
         {
 
-            List<int> Unused1 = new List<int>();
-            List<int> Unused2 = new List<int>();
-            List<int> NbrVertices = new List<int>();
-            List<int> VertexIndex = new List<int>();
+            List<int> NbrVertices_x3 = new List<int>();
+            List<int> FaceStartIndex = new List<int>();
+            List<int> NbrFaces_x3 = new List<int>();
+            List<int> VertexStartIndex = new List<int>();
             List<String> objName = new List<String>();
             List<String> textureName = new List<String>();
             List<objParams> ObjParamList = new List<objParams>();
@@ -275,16 +275,16 @@ namespace c3d2obj
 
                     if (verbose) Console.WriteLine("File contains {0} objects", NbrObj);
 
-                    // For each object in the c3d file ...
+                    // For each object in the c3d file read each object's generic parameters
                     for (count = 0; count < NbrObj; count++)
                     {
                         // Read the object parameters
                         objParams objParam = new objParams();
                         objName.Add(readBinary.ReadString());
-                        VertexIndex.Add(readBinary.ReadInt32());
-                        Unused1.Add(readBinary.ReadInt32());
-                        Unused2.Add(readBinary.ReadInt32());
-                        NbrVertices.Add(readBinary.ReadInt32());
+                        VertexStartIndex.Add(readBinary.ReadInt32());
+                        NbrVertices_x3.Add(readBinary.ReadInt32());
+                        FaceStartIndex.Add(readBinary.ReadInt32());
+                        NbrFaces_x3.Add(readBinary.ReadInt32());
                         textureName.Add(readBinary.ReadString());
                         objParam.Red = readBinary.ReadSingle();
                         objParam.Green = readBinary.ReadSingle();
@@ -310,10 +310,11 @@ namespace c3d2obj
                     }
                     if (verbose) Console.WriteLine(MtlFN + " written");
 
+                    // Next is the total number of vertices (over all objects)
                     int TotalNbrVertices = readBinary.ReadInt32();
-                    List<cFace>[] faceArray = new List<cFace>[32];
-                    List<cVertex>[] objArray = new List<cVertex>[32];
                     List<cVertex> VertexList = new List<cVertex>();
+
+                    // Read the vertex information into VertexList
                     for (count = 0; count < TotalNbrVertices; count++)
                     {
                         cVertex Vertex = new cVertex();
@@ -347,13 +348,13 @@ namespace c3d2obj
                     fsC3DReader.Close();
                         
                     /*
-                        * Now for each object we have the general information such as names and RGB values.
-                        * There is also a list of vertices with their X Y Z nX Ny nZ U and V values
-                        * For each face there is a list of indices in an array of face lists
-                        * 
-                        * Now need to rearrange all that data into .obj format
-                        * There is a separate section for each object
-                        */
+                    * Now for each object we have the general information such as names and RGB values.
+                    * There is also a list of vertices with their X Y Z nX Ny nZ U and V values
+                    * For each face there is a list of indices into VertexList
+                    * 
+                    * Now need to rearrange all that data into .obj format
+                    * There is a separate section for each object
+                    */
                     int faceIndex = 0;
                     int UVIndex = 0;
                     int OldUVIndex = 0;
@@ -361,6 +362,8 @@ namespace c3d2obj
                     int OldXYZIndex = 0;
                     int NormalIndex = 0;
                     int OldNormalIndex = 0;
+                    
+                    #region for each object
                     for (int objCount = 0; objCount < NbrObj; objCount++)
                     {
                         // Write name of material file
@@ -369,16 +372,10 @@ namespace c3d2obj
 
                         int maxCount;
 
-                        if (objCount == NbrObj - 1)
-                        {
-                            maxCount = TotalNbrVertices - VertexIndex[objCount];
-                        }
-                        else
-                        {
-                            maxCount = VertexIndex[objCount + 1] - VertexIndex[objCount];
-                        }
+                        maxCount = NbrVertices_x3[objCount];
                         // Create list of vertices with the same X Y Z values
                         OutputVertexList.Clear();
+                        XYZIndex = VertexStartIndex[objCount];
                         for (int i = 0; i < maxCount; i++)
                         {
                             cVertex v = VertexList[XYZIndex++];
@@ -389,7 +386,7 @@ namespace c3d2obj
                                 ov.X = v.X;
                                 ov.Y = v.Y;
                                 ov.Z = v.Z;
-                                // Add this to the OutputVertixList
+                                // Add this to the OutputVertexList
                                 OutputVertexList.Add(ov);
                                 // Write v .obj record
                                 writer.Write("v " + ov.X.ToString("0.000000") + " " + ov.Z.ToString("0.000000") + " " + ov.Y.ToString("0.000000") + Environment.NewLine);
@@ -398,6 +395,7 @@ namespace c3d2obj
 
                         OutputUVList.Clear();
                         // Create list of unique UVs
+                        UVIndex = VertexStartIndex[objCount];
                         for (int i = 0; i < maxCount; i++)
                         {
                             cVertex v = VertexList[UVIndex++];
@@ -414,6 +412,7 @@ namespace c3d2obj
 
                         // Create list of unique Normals
                         OutputNormalList.Clear();
+                        NormalIndex = VertexStartIndex[objCount];
                         for (int i = 0; i < maxCount; i++)
                         {
                             cVertex v = VertexList[NormalIndex++];
@@ -425,7 +424,7 @@ namespace c3d2obj
                                 oNormal.B = v.nY;
                                 oNormal.C = v.nZ;
                                 OutputNormalList.Add(oNormal);
-                                writer.Write("vn " + oNormal.A.ToString("0.0000") + " " + oNormal.C.ToString("0.0000") + " " + oNormal.B.ToString("0.0000") + Environment.NewLine);
+                                writer.Write("vn " + oNormal.A.ToString("0.000000") + " " + oNormal.C.ToString("0.000000") + " " + oNormal.B.ToString("0.000000") + Environment.NewLine);
                             }
                         }
 
@@ -438,93 +437,124 @@ namespace c3d2obj
                         int[] nNum = new int[3]; // Normal
 
                         /*
-                            * for each face we need 9 numbers, which are indexes
+                            * for each face we need 9 numbers, which are indecies
                             * i.e. the first vertex is number 1, the second number 2 etc.
                             * The same applies for textures (UV coordinates) and Normals
                             * 
                             * 
                             */
-                        for (int i = 0; i < NbrVertices[objCount] / 3; i++)
+                        faceIndex = FaceStartIndex[objCount] / 3;
+                        for (int i = 0; i < NbrFaces_x3[objCount] / 3; i++)
                         {
-                            {
-                                cFace f = FaceList[faceIndex++];
-                                // f.A is the integer index of one vertex of the face
-                                // Get the XYZ of that vertex
-                                var Coord = new cOutputVertex();
-                                Coord.X = VertexList[f.A].X;
-                                Coord.Y = VertexList[f.A].Y;
-                                Coord.Z = VertexList[f.A].Z;
-                                var es = new XYZ(Coord);
-                                // Now find the index of that coordinate in the OutputVertexList 
-                                vNum[0] = 1 + OutputVertexList.FindIndex(es.eq) + OldXYZIndex;
+                            cFace f = FaceList[faceIndex++];
+                            // f.A is the integer index of one vertex of the face
+                            // Get the XYZ of that vertex
+                            var Coord = new cOutputVertex();
+                            Coord.X = VertexList[f.A].X;
+                            Coord.Y = VertexList[f.A].Y;
+                            Coord.Z = VertexList[f.A].Z;
+                            var es = new XYZ(Coord);
+                            // Now find the index of that coordinate in the OutputVertexList 
+                            vNum[0] = OutputVertexList.FindIndex(es.eq);
+                            if (vNum[0] == -1)
+                                break;
+                            vNum[0] += 1 + OldXYZIndex;
 
-                                Coord.X = VertexList[f.B].X;
-                                Coord.Y = VertexList[f.B].Y;
-                                Coord.Z = VertexList[f.B].Z;
-                                // Now find the index of that coordinate in the OutputVertexList 
-                                vNum[1] = 1 + OutputVertexList.FindIndex(es.eq) + OldXYZIndex;
+                            Coord.X = VertexList[f.B].X;
+                            Coord.Y = VertexList[f.B].Y;
+                            Coord.Z = VertexList[f.B].Z;
+                            // Now find the index of that coordinate in the OutputVertexList 
+                            vNum[1] = OutputVertexList.FindIndex(es.eq);
+                            if (vNum[1] == -1)
+                                break;
+                            vNum[1] += 1 + OldXYZIndex;
 
-                                Coord.X = VertexList[f.C].X;
-                                Coord.Y = VertexList[f.C].Y;
-                                Coord.Z = VertexList[f.C].Z;
-                                // Now find the index of that coordinate in the OutputVertexList 
-                                vNum[2] = 1 + OutputVertexList.FindIndex(es.eq) + OldXYZIndex;
+                            Coord.X = VertexList[f.C].X;
+                            Coord.Y = VertexList[f.C].Y;
+                            Coord.Z = VertexList[f.C].Z;
+                            // Now find the index of that coordinate in the OutputVertexList 
+                            vNum[2] = OutputVertexList.FindIndex(es.eq);
+                            if (vNum[2] == -1)
+                                break;
+                            vNum[2] += 1 + OldXYZIndex;
 
-                                var OUV = new cOutputUV();
-                                OUV.U = VertexList[f.A].U;
-                                OUV.V = VertexList[f.A].V;
-                                var oOUV = new UV(OUV);
+                            var OUV = new cOutputUV();
+                            OUV.U = VertexList[f.A].U;
+                            OUV.V = VertexList[f.A].V;
+                            var oOUV = new UV(OUV);
 
-                                // Now find the index of that coordinate in the OutputUVList 
-                                tNum[0] = 1 + OutputUVList.FindIndex(oOUV.eq) + OldUVIndex;
+                            // Now find the index of that coordinate in the OutputUVList 
+                            tNum[0] = OutputUVList.FindIndex(oOUV.eq);
+                            if (tNum[0] == -1)
+                                break;
+                            tNum[0] += 1 + OldUVIndex;
 
-                                OUV.U = VertexList[f.B].U;
-                                OUV.V = VertexList[f.B].V;
-                                // Now find the index of that coordinate in the OutputUVList 
-                                tNum[1] = 1 + OutputUVList.FindIndex(oOUV.eq) + OldUVIndex;
+                            OUV.U = VertexList[f.B].U;
+                            OUV.V = VertexList[f.B].V;
+                            // Now find the index of that coordinate in the OutputUVList 
+                            tNum[1] = OutputUVList.FindIndex(oOUV.eq);
+                            if (tNum[1] == -1)
+                                break;
+                            tNum[1] += 1 + OldUVIndex;
 
-                                OUV.U = VertexList[f.C].U;
-                                OUV.V = VertexList[f.C].V;
-                                // Now find the index of that coordinate in the OutputUVList 
-                                tNum[2] = 1 + OutputUVList.FindIndex(oOUV.eq) + OldUVIndex;
+                            OUV.U = VertexList[f.C].U;
+                            OUV.V = VertexList[f.C].V;
+                            // Now find the index of that coordinate in the OutputUVList 
+                            tNum[2] = OutputUVList.FindIndex(oOUV.eq);
+                            if (tNum[2] == -1)
+                                break;
+                            tNum[2] += 1 + OldUVIndex;
 
-                                var ONorm = new cOutputNormal();
-                                ONorm.A = VertexList[f.A].nX;
-                                ONorm.B = VertexList[f.A].nY;
-                                ONorm.C = VertexList[f.A].nZ;
-                                var oABC = new ABC(ONorm);
+                            var ONorm = new cOutputNormal();
+                            ONorm.A = VertexList[f.A].nX;
+                            ONorm.B = VertexList[f.A].nY;
+                            ONorm.C = VertexList[f.A].nZ;
+                            var oABC = new ABC(ONorm);
 
-                                // Now find the index of that coordinate in the OutputNormalList 
-                                nNum[0] = 1 + OutputNormalList.FindIndex(oABC.eq) + OldNormalIndex;
+                            // Now find the index of that coordinate in the OutputNormalList 
+                            nNum[0] = OutputNormalList.FindIndex(oABC.eq);
+                            if (nNum[0] == -1)
+                                break;
+                            nNum[0] += 1 + OldNormalIndex;
 
-                                ONorm.A = VertexList[f.B].nX;
-                                ONorm.B = VertexList[f.B].nY;
-                                ONorm.C = VertexList[f.B].nZ;
-                                // Now find the index of that coordinate in the OutputNormalList 
-                                nNum[1] = 1 + OutputNormalList.FindIndex(oABC.eq) + OldNormalIndex;
+                            ONorm.A = VertexList[f.B].nX;
+                            ONorm.B = VertexList[f.B].nY;
+                            ONorm.C = VertexList[f.B].nZ;
+                            // Now find the index of that coordinate in the OutputNormalList 
+                            nNum[1] = OutputNormalList.FindIndex(oABC.eq);
+                            if (nNum[1] == -1)
+                                break;
+                            nNum[1] += 1 + OldNormalIndex;
 
-                                ONorm.A = VertexList[f.C].nX;
-                                ONorm.B = VertexList[f.C].nY;
-                                ONorm.C = VertexList[f.C].nZ;
-                                // Now find the index of that coordinate in the OutputNormalList 
-                                nNum[2] = 1 + OutputNormalList.FindIndex(oABC.eq) + OldNormalIndex;
+                            ONorm.A = VertexList[f.C].nX;
+                            ONorm.B = VertexList[f.C].nY;
+                            ONorm.C = VertexList[f.C].nZ;
+                            // Now find the index of that coordinate in the OutputNormalList 
+                            nNum[2] = OutputNormalList.FindIndex(oABC.eq);
+                            if (nNum[2] == -1)
+                                break;
+                            nNum[2] += 1 + OldNormalIndex;
 
-                                // The order these are written is important!
-                                writer.Write("f " + vNum[0] + "/" + tNum[0] + "/" + nNum[0] + " ");
-                                writer.Write(vNum[2] + "/" + tNum[2] + "/" + nNum[2] + " ");
-                                writer.Write(vNum[1] + "/" + tNum[1] + "/" + nNum[1] + Environment.NewLine);
-                                writer.Flush();
-                            }
+                            // The order these are written is important!
+                            writer.Write("f " + vNum[0] + "/" + tNum[0] + "/" + nNum[0] + " ");
+                            writer.Write(vNum[2] + "/" + tNum[2] + "/" + nNum[2] + " ");
+                            writer.Write(vNum[1] + "/" + tNum[1] + "/" + nNum[1] + Environment.NewLine);
+                            writer.Flush();
                         }
                         OldXYZIndex += OutputVertexList.Count;
                         OldUVIndex += OutputUVList.Count;
                         OldNormalIndex += OutputNormalList.Count;
                     }
+                    #endregion
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine("Oh dear something went wrong");
                     Console.WriteLine(ex.Message);
+                    writer.Flush();
+                    fsObjWriter.Close();
+                    MtlWriter.Flush();
+                    fsMtlWriter.Close();
                 }
                 writer.Flush();
                 fsObjWriter.Close();
