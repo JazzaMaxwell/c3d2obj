@@ -1,0 +1,3 @@
+To convert all .c3d files in a folder use the following from PowerShell -
+
+dir -Filter *.c3d| ForEach-Object{.\c3d2obj -f $_.FullName}

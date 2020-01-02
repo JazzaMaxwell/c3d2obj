@@ -440,9 +440,7 @@ namespace c3d2obj
                             * for each face we need 9 numbers, which are indecies
                             * i.e. the first vertex is number 1, the second number 2 etc.
                             * The same applies for textures (UV coordinates) and Normals
-                            * 
-                            * 
-                            */
+                        */
                         faceIndex = FaceStartIndex[objCount] / 3;
                         for (int i = 0; i < NbrFaces_x3[objCount] / 3; i++)
                         {

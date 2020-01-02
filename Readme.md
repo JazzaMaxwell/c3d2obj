@@ -4,9 +4,11 @@ c3d2obj is a command line utility to convert Condor 2 .c3d files of Wavefront .o
 
 ## Installation
 
-No installation is needed. Just copy bin\Release\c3d2obj.exe to the folder with your .c3d files. 
+No installation is needed. Just copy the c3d2obj.exe to the folder with your .c3d files. 
 
 You could put it elsewhere and add the path to it in the PATH environment variable.
+
+The md5 hash of the .exe is: 380AB648026C8151E98D2BB02408FF0C
 
 ## Usage
 
@@ -14,13 +16,13 @@ The program only runs under Windows. It's been tested on Windows 7 and Windows 1
 
 Open a Command shell or Windows PowerShell. cd to your working folder.
 
-`c3d2obj -f <filename> | -v`
+`.\c3d2obj -f <filename> | -v`
 
 filename needs to be a .c3d file but you can leave off the extension.
 
 -v for verbose mode
 
-Note the | above shows the -v is optional. Don't type it in.
+Note the | above shows the -v is optional. Don't type it in. The .\ at the start of the line indicates the .exe is in the current folder.
  
 ## Dependancies
 The program needs Windows .NET Framework 4.5 or later. This is a standard part of Windows.
